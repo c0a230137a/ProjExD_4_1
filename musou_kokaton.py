@@ -72,6 +72,7 @@ class Bird(pg.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.center = xy
         self.speed = 10
+        self.boost_speed = 20
 
     def change_img(self, num: int, screen: pg.Surface):
         """
@@ -93,9 +94,10 @@ class Bird(pg.sprite.Sprite):
             if key_lst[k]:
                 sum_mv[0] += mv[0]
                 sum_mv[1] += mv[1]
-        self.rect.move_ip(self.speed*sum_mv[0], self.speed*sum_mv[1])
+        current_speed = self.boost_speed if key_lst[pg.K_LSHIFT] else self.speed
+        self.rect.move_ip(current_speed*sum_mv[0], current_speed*sum_mv[1])
         if check_bound(self.rect) != (True, True):
-            self.rect.move_ip(-self.speed*sum_mv[0], -self.speed*sum_mv[1])
+            self.rect.move_ip(-current_speed*sum_mv[0], -current_speed*sum_mv[1])
         if not (sum_mv[0] == 0 and sum_mv[1] == 0):
             self.dire = tuple(sum_mv)
             self.image = self.imgs[self.dire]
@@ -187,7 +189,7 @@ class Explosion(pg.sprite.Sprite):
     def update(self):
         """
         爆発時間を1減算した爆発経過時間_lifeに応じて爆発画像を切り替えることで
-        爆発エフェクトを表現する
+        爆発エフェクトを表示する
         """
         self.life -= 1
         self.image = self.imgs[self.life//10%2]
