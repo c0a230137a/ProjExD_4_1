@@ -72,7 +72,6 @@ class Bird(pg.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.center = xy
         self.speed = 10
-        self.boost_speed = 20
 
     def change_img(self, num: int, screen: pg.Surface):
         """
@@ -94,14 +93,46 @@ class Bird(pg.sprite.Sprite):
             if key_lst[k]:
                 sum_mv[0] += mv[0]
                 sum_mv[1] += mv[1]
-        current_speed = self.boost_speed if key_lst[pg.K_LSHIFT] else self.speed
-        self.rect.move_ip(current_speed*sum_mv[0], current_speed*sum_mv[1])
+        self.rect.move_ip(self.speed*sum_mv[0], self.speed*sum_mv[1])
         if check_bound(self.rect) != (True, True):
-            self.rect.move_ip(-current_speed*sum_mv[0], -current_speed*sum_mv[1])
+            self.rect.move_ip(-self.speed*sum_mv[0], -self.speed*sum_mv[1])
         if not (sum_mv[0] == 0 and sum_mv[1] == 0):
             self.dire = tuple(sum_mv)
             self.image = self.imgs[self.dire]
         screen.blit(self.image, self.rect)
+
+class Shield(pg.sprite.Sprite):
+    """
+    防御壁に関するクラス
+    """
+    def __init__(self, bird: Bird, life: int):
+        """
+        防御壁を生成する
+        引数1 bird：こうかとん
+        引数2 life：防御壁の発動時間
+        """
+        super().__init__()
+        self.bird = bird
+        self.life = life
+
+        # 防御壁の初期設定
+        self.image = pg.Surface((20, bird.rect.height * 2), pg.SRCALPHA)
+        pg.draw.rect(self.image, (0, 0, 255, 128), (0, 0, 20, bird.rect.height * 2))
+        self.rect = self.image.get_rect()
+        vx, vy = bird.dire
+        angle = math.degrees(math.atan2(-vy, vx))
+        self.image = pg.transform.rotate(self.image, angle)
+        self.rect = self.image.get_rect()
+        self.rect.center = bird.rect.centerx + vx * bird.rect.width, bird.rect.centery + vy * bird.rect.height
+
+    def update(self):
+        """
+        防御壁の位置と残り時間を更新する
+        """
+        self.life -= 1
+        if self.life <= 0:
+            self.kill()
+    
 
 
 class Bomb(pg.sprite.Sprite):
@@ -189,7 +220,7 @@ class Explosion(pg.sprite.Sprite):
     def update(self):
         """
         爆発時間を1減算した爆発経過時間_lifeに応じて爆発画像を切り替えることで
-        爆発エフェクトを表示する
+        爆発エフェクトを表現する
         """
         self.life -= 1
         self.image = self.imgs[self.life//10%2]
@@ -255,6 +286,8 @@ def main():
     beams = pg.sprite.Group()
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
+    shields = pg.sprite.Group()
+
 
     tmr = 0
     clock = pg.time.Clock()
@@ -265,6 +298,17 @@ def main():
                 return 0
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 beams.add(Beam(bird))
+            if event.type == pg.QUIT:
+                return 0
+            if event.type == pg.KEYDOWN:
+                # ビーム発射
+                if event.key == pg.K_SPACE:
+                    beams.add(Beam(bird))
+                # 防御壁の発動条件：「s」キー押下＋スコア50以上＋防御壁が存在しないss
+            if event.type == pg.KEYDOWN and event.key==pg.K_s and score.value >= 50 and len(shields) == 0:
+                    
+                shields.add(Shield(bird, 400))
+                score.value -= 50
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
@@ -277,7 +321,7 @@ def main():
 
         for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():  # ビームと衝突した敵機リスト
             exps.add(Explosion(emy, 100))  # 爆発エフェクト
-            score.value += 10  # 10点アップ
+            score.value += 10 # 10点アップ
             bird.change_img(6, screen)  # こうかとん喜びエフェクト
 
         for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():  # ビームと衝突した爆弾リスト
@@ -290,6 +334,20 @@ def main():
             pg.display.update()
             time.sleep(2)
             return
+
+        
+    
+                    
+                   
+
+                  
+                    
+        # 防御壁と爆弾の衝突処理
+        for bomb in pg.sprite.groupcollide(bombs, shields, True, False).keys():
+            exps.add(Explosion(bomb, 50))  # 爆発エフェクト
+
+        shields.update()
+        shields.draw(screen)
 
         bird.update(key_lst, screen)
         beams.update()
