@@ -72,6 +72,8 @@ class Bird(pg.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.center = xy
         self.speed = 10
+        self.state = "normal"  # 状態管理（通常: "normal", 無敵: "hyper"）
+        self.hyper_life = 0  # 無敵状態の残りフレーム数
 
     def change_img(self, num: int, screen: pg.Surface):
         """
@@ -99,6 +101,13 @@ class Bird(pg.sprite.Sprite):
         if not (sum_mv[0] == 0 and sum_mv[1] == 0):
             self.dire = tuple(sum_mv)
             self.image = self.imgs[self.dire]
+        
+        # 無敵状態の処理
+        if self.state == "hyper":
+            self.image = pg.transform.laplacian(self.image)  # 無敵時の画像変換
+            self.hyper_life -= 1
+            if self.hyper_life <= 0:
+                self.state = "normal"
         screen.blit(self.image, self.rect)
 
 
@@ -310,6 +319,12 @@ def main():
                 emp = EMP(emys, bombs, screen)
                 emp.activate()
                 score.value -= 20
+            if event.type == pg.KEYDOWN and event.key == pg.K_RSHIFT:
+                # 無敵状態の発動条件
+                if score.value >= 100 and bird.state == "normal":
+                    bird.state = "hyper"
+                    bird.hyper_life = 500  # 無敵時間
+                    score.value -= 100  # スコア消費
 
         screen.blit(bg_img, [0, 0])
 
@@ -322,13 +337,24 @@ def main():
                 bombs.add(Bomb(emy, bird))
 
         for emy in pg.sprite.groupcollide(emys, beams, True, True).keys():  # ビームと衝突した敵機リスト
-            exps.add(Explosion(emy, 100))  # 爆  エフェクト
+            exps.add(Explosion(emy, 100))  # 爆発エフェクト
             score.value += 10 # 10点アップ
             bird.change_img(6, screen)  # こうかとん喜びエフェクト
 
         for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():  # ビームと衝突した爆弾リスト
             exps.add(Explosion(bomb, 50))  # 爆発エフェクト
             score.value += 1  # 1点アップ
+
+        for bomb in pg.sprite.spritecollide(bird, bombs, True):
+            if bird.state == "hyper":  # 無敵状態
+                exps.add(Explosion(bomb, 50))
+                score.value += 1
+            else:  # 通常状態
+                bird.change_img(8, screen)
+                score.update(screen)
+                pg.display.update()
+                time.sleep(2)
+                return
 
         for bomb in pg.sprite.spritecollide(bird, bombs, True):  # こうかとんと衝突した爆弾リスト
             if bomb.state == "active":  # 爆弾がアクティブな場合のみ爆発
